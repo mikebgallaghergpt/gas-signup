@@ -1,9 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+// src/lib/supabaseClient.ts
+import { createClient } from "@supabase/supabase-js";
 
-// Values pulled from your .env file at project root
-const url = import.meta.env.VITE_SUPABASE_URL!;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+const url = import.meta.env.VITE_SUPABASE_URL as string;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-export const supabase = createClient(url, key, {
-  auth: { persistSession: true },
-});
+if (!url || !key) {
+  console.warn("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
+}
+
+export const supabase = createClient(url, key);

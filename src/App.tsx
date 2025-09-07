@@ -4,7 +4,7 @@ import { supabase } from "./lib/supabaseClient";
 import { useNavigate, Routes, Route } from "react-router-dom";
 import "./App.css";
 import ThankYou from "./ThankYou";
-import logo from "./assets/logo.svg"; // <-- use your SVG logo here
+import logo from "./assets/logo.svg";
 
 type FormData = {
   first_name: string;
@@ -40,16 +40,34 @@ function SignupForm() {
         throw new Error("Please fill in first name, last name, and email.");
       }
 
+      // Save to Supabase
       const { error } = await supabase.from("signups").insert({
         first_name: data.first_name.trim(),
         last_name: data.last_name.trim(),
         email: data.email.trim(),
         phone: data.phone?.trim() || null,
       });
-
       if (error) throw error;
 
-      // ✅ Redirect to Thank You page
+      // Send confirmation email via Postmark (through our Vercel API route)
+      try {
+        const r = await fetch("/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: data.email,
+            subject: "Welcome to Gallagher Art School 🎨",
+            text: `Hi ${data.first_name},\n\nThanks for signing up! We'll contact you soon with class options.\n\n- Gallagher Art School`,
+          }),
+        });
+        const payload = await r.json().catch(() => ({ note: "non-JSON response" }));
+        console.log("[send-email] status", r.status, payload);
+        if (!r.ok) console.warn("Email send failed, but signup was saved.", payload);
+      } catch (mailErr) {
+        console.warn("Email send threw, but signup was saved.", mailErr);
+      }
+
+      // Redirect to Thank You page
       navigate("/thank-you");
     } catch (err: any) {
       setErrorMsg(err.message ?? "Something went wrong. Please try again.");
@@ -61,11 +79,7 @@ function SignupForm() {
   return (
     <div className="container">
       {/* Logo at the top */}
-      <img
-        src={logo}
-        alt="Gallagher Art School logo"
-        className="thankyou-logo"
-      />
+      <img src={logo} alt="Gallagher Art School logo" className="thankyou-logo" />
 
       <h1>Join Gallagher Art School</h1>
       <p>Tell us about yourself and we’ll reach out with class options.</p>
@@ -90,7 +104,7 @@ function SignupForm() {
 
         <div className="field">
           <label htmlFor="last_name">Last Name *</label>
-          <input
+        <input
             id="last_name"
             name="last_name"
             value={data.last_name}
