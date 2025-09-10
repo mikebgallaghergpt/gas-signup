@@ -1,107 +1,188 @@
 // src/App.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 import "./App.css";
 import logo from "./assets/logo.svg";
 
+/* ------------------------- Types ------------------------- */
 type FormData = {
   first_name: string;
   last_name: string;
   email: string;
   phone?: string;
-  interests: string[];     // new
-  availability: string;    // new
-  notes?: string;          // new
+  experience_level: string; // dropdown
 };
 
-const ALL_INTERESTS = [
-  "Drawing",
-  "Oil Painting",
-  "Watercolor",
-  "Sculpture",
-  "Kids Classes",
-  "Adult Classes",
+type Slide = {
+  src: string;
+  title: string;
+  blurb: string;
+};
+
+/* --------------------- Carousel Content ------------------ */
+/* Uses your files from public/images */
+const CAROUSEL: Slide[] = [
+  {
+    src: "/images/3DDrawing.jpg",
+    title: "3D Drawing",
+    blurb: "Bring depth and perspective into your sketches.",
+  },
+  {
+    src: "/images/IceCreamCone.webp",
+    title: "Still Life",
+    blurb: "Learn balance, proportion, and shading with fun objects.",
+  },
+  {
+    src: "/images/Color.webp",
+    title: "Color Theory",
+    blurb: "Understand how colors interact and create mood.",
+  },
+  {
+    src: "/images/House.webp",
+    title: "Pointilism",
+    blurb: "Explore Pointilism with dynamic forms.",
+  },
+  {
+    src: "/images/StarryNight.webp",
+    title: "Master Studies",
+    blurb: "Learn by recreating the techniques of the greats.",
+  },
+  {
+    src: "/images/Year o the Rabbit.webp",
+    title: "Master Studies",
+    blurb: "Explore Cubism and Abstraction",
+  },
 ];
 
-const STEPS = ["Contact", "Interests", "Availability"];
+const EXPERIENCE_OPTIONS = [
+  "Beginner",
+  "Some experience",
+  "Intermediate",
+  "Advanced",
+];
 
-export default function App() {
-  // --------- INIT
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+/* --------------------- Carousel Component ---------------- */
+function Carousel() {
+  const [index, setIndex] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    // auto-advance every 5s
+    timerRef.current = window.setInterval(() => {
+      setIndex((i) => (i + 1) % CAROUSEL.length);
+    }, 5000) as unknown as number;
+
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const go = (i: number) =>
+    setIndex(((i % CAROUSEL.length) + CAROUSEL.length) % CAROUSEL.length);
+
+  const slide = CAROUSEL[index];
+
+  return (
+    <aside className="carousel-pane" aria-label="Art topics carousel">
+      <div className="carousel">
+        <div className="carousel-viewport">
+          {CAROUSEL.map((s, i) => (
+            <figure
+              key={s.title}
+              className={`carousel-slide ${i === index ? "active" : ""}`}
+              aria-hidden={i !== index}
+            >
+              <img src={s.src} alt={s.title} />
+              <figcaption>
+                <h3>{s.title}</h3>
+                <p>{s.blurb}</p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <div className="carousel-controls" aria-label="Carousel controls">
+          <button
+            type="button"
+            className="dot-prevnext"
+            onClick={() => go(index - 1)}
+            aria-label="Previous slide"
+          >
+            ‹
+          </button>
+
+          <div className="dots" role="tablist" aria-label="Slides">
+            {CAROUSEL.map((_, i) => (
+              <button
+                key={i}
+                className={`dot ${i === index ? "active" : ""}`}
+                onClick={() => go(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                aria-selected={i === index}
+                role="tab"
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="dot-prevnext"
+            onClick={() => go(index + 1)}
+            aria-label="Next slide"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* --------------------- Signup Form Component -------------- */
+function SignupForm() {
   const [data, setData] = useState<FormData>({
     first_name: "",
     last_name: "",
     email: "",
     phone: "",
-    interests: [],
-    availability: "",
-    notes: "",
+    experience_level: "",
   });
 
-  // Log email mode (SIMULATION vs LIVE)
-  useEffect(() => {
-    const isDry =
-      (import.meta.env.VITE_EMAIL_DRY_RUN || "false").toLowerCase() === "true";
-    console.log(
-      isDry
-        ? "📧 Email mode: SIMULATION (Postmark OFF)"
-        : "📧 Email mode: LIVE (Postmark ON)"
-    );
-  }, []);
-
-  // --------- HELPERS
-  const canNext = useMemo(() => {
-    if (step === 0) {
-      return !!(data.first_name && data.last_name && data.email);
-    }
-    if (step === 1) {
-      return data.interests.length > 0;
-    }
-    if (step === 2) {
-      return data.availability.trim().length > 0;
-    }
-    return true;
-  }, [step, data]);
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   function onChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) {
     const { name, value } = e.target;
     setData((d) => ({ ...d, [name]: value }));
   }
 
-  function toggleInterest(i: string) {
-    setData((d) =>
-      d.interests.includes(i)
-        ? { ...d, interests: d.interests.filter((x) => x !== i) }
-        : { ...d, interests: [...d.interests, i] }
-    );
-  }
-
-  async function onSubmitFinal() {
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setSuccessMsg(null);
     setErrorMsg(null);
+
     try {
+      if (!data.first_name || !data.last_name || !data.email) {
+        throw new Error("Please fill in first name, last name, and email.");
+      }
+
       // Save to Supabase
       const { error } = await supabase.from("signups").insert({
         first_name: data.first_name.trim(),
         last_name: data.last_name.trim(),
         email: data.email.trim(),
         phone: data.phone?.trim() || null,
-        interests: data.interests,
-        availability: data.availability.trim(),
-        notes: data.notes?.trim() || null,
+        experience_level: data.experience_level || null,
       });
       if (error) throw error;
 
-      // Fire email (API handles DRY_RUN)
+      // Fire email (API handles DRY_RUN if you've set EMAIL_DRY_RUN=true in Vercel)
       try {
-        const r = await fetch("/api/send-email", {
+        await fetch("/api/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -109,36 +190,25 @@ export default function App() {
             subject: "Welcome to Gallagher Art School 🎨",
             text: `Hi ${data.first_name},
 
-Thanks for signing up! You selected: ${data.interests.join(", ") || "—"}.
-Availability: ${data.availability || "—"}
-
-We’ll contact you soon with class options.
+Thanks for signing up! We'll contact you soon with class options.
 
 – Gallagher Art School`,
           }),
         });
-        if (!r.ok) {
-          const jj = await r.json().catch(() => null);
-          console.warn("[send-email] non-200", r.status, jj);
-        }
       } catch (mailErr) {
-        console.warn("[send-email] threw", mailErr);
+        console.warn("[send-email] skipped or failed", mailErr);
       }
 
       setSuccessMsg(
         "Thanks! You’re on the list. We’ll reach out shortly with class options."
       );
-      // Reset to step 0, keep the UX on the success message
       setData({
         first_name: "",
         last_name: "",
         email: "",
         phone: "",
-        interests: [],
-        availability: "",
-        notes: "",
+        experience_level: "",
       });
-      setStep(0);
     } catch (err: any) {
       setErrorMsg(err?.message ?? "Something went wrong. Please try again.");
     } finally {
@@ -146,14 +216,15 @@ We’ll contact you soon with class options.
     }
   }
 
-  // --------- UI
+  const isDry =
+    (import.meta.env.VITE_EMAIL_DRY_RUN || "false").toLowerCase() === "true";
+
   return (
-    <div className="container">
-      <img src={logo} alt="Gallagher Art School logo" className="thankyou-logo" />
+    <main className="form-pane">
+      <img src={logo} alt="Gallagher Art School logo" className="brand-logo" />
       <h1>Join Gallagher Art School</h1>
       <p>Tell us about yourself and we’ll reach out with class options.</p>
 
-      {/* Notices */}
       {successMsg && (
         <div className="notice notice-success" role="status" aria-live="polite">
           {successMsg}
@@ -164,118 +235,91 @@ We’ll contact you soon with class options.
           {errorMsg}
         </div>
       )}
-      {(import.meta.env.VITE_EMAIL_DRY_RUN || "false").toLowerCase() === "true" && (
+      {isDry && (
         <div className="notice-info">
-          ⚠️ Email sending is <b>simulated</b> until Postmark is approved.
+          ⚠️ Email sending is <b>simulated</b> until Postmark approves.
         </div>
       )}
 
-      {/* Progress */}
-      <ol className="steps" aria-label="Signup progress">
-        {STEPS.map((label, idx) => (
-          <li key={label} className={idx === step ? "active" : idx < step ? "done" : ""}>
-            <span className="step-index">{idx + 1}</span>
-            <span className="step-label">{label}</span>
-          </li>
-        ))}
-      </ol>
-
-      {/* Step content */}
-      <div className="card">
-        {step === 0 && (
-          <section aria-labelledby="contact-heading">
-            <h2 id="contact-heading" className="visually-hidden">Contact</h2>
-            <div className="field">
-              <label htmlFor="first_name">First Name *</label>
-              <input id="first_name" name="first_name" value={data.first_name} onChange={onChange} required />
-            </div>
-            <div className="field">
-              <label htmlFor="last_name">Last Name *</label>
-              <input id="last_name" name="last_name" value={data.last_name} onChange={onChange} required />
-            </div>
-            <div className="field">
-              <label htmlFor="email">Email *</label>
-              <input id="email" name="email" type="email" value={data.email} onChange={onChange} required />
-            </div>
-            <div className="field">
-              <label htmlFor="phone">Phone</label>
-              <input id="phone" name="phone" value={data.phone} onChange={onChange} placeholder="(555) 123-4567" />
-            </div>
-          </section>
-        )}
-
-        {step === 1 && (
-          <section aria-labelledby="interests-heading">
-            <h2 id="interests-heading" className="visually-hidden">Interests</h2>
-            <div className="checkbox-grid">
-              {ALL_INTERESTS.map((i) => (
-                <label key={i} className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={data.interests.includes(i)}
-                    onChange={() => toggleInterest(i)}
-                  />
-                  <span>{i}</span>
-                </label>
-              ))}
-            </div>
-            <div className="field">
-              <label htmlFor="notes">Notes (optional)</label>
-              <textarea id="notes" name="notes" value={data.notes} onChange={onChange} rows={3} />
-            </div>
-          </section>
-        )}
-
-        {step === 2 && (
-          <section aria-labelledby="availability-heading">
-            <h2 id="availability-heading" className="visually-hidden">Availability</h2>
-            <div className="field">
-              <label htmlFor="availability">When are you available? *</label>
-              <input
-                id="availability"
-                name="availability"
-                value={data.availability}
-                onChange={onChange}
-                placeholder="e.g., Weeknights after 6pm, Sat mornings"
-                required
-              />
-            </div>
-            <div className="summary">
-              <h3>Review</h3>
-              <ul>
-                <li><b>Name:</b> {data.first_name} {data.last_name}</li>
-                <li><b>Email:</b> {data.email}</li>
-                {data.phone ? <li><b>Phone:</b> {data.phone}</li> : null}
-                <li><b>Interests:</b> {data.interests.join(", ") || "—"}</li>
-                <li><b>Availability:</b> {data.availability || "—"}</li>
-                {data.notes ? <li><b>Notes:</b> {data.notes}</li> : null}
-              </ul>
-            </div>
-          </section>
-        )}
-
-        {/* Nav buttons */}
-        <div className="actions">
-          {step > 0 && (
-            <button type="button" className="btn-secondary" onClick={() => setStep((s) => s - 1)} disabled={loading}>
-              Back
-            </button>
-          )}
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => Math.min(s + 1, STEPS.length - 1))}
-              disabled={!canNext || loading}
-            >
-              Next
-            </button>
-          ) : (
-            <button type="button" onClick={onSubmitFinal} disabled={!canNext || loading}>
-              {loading ? "Submitting…" : "Submit"}
-            </button>
-          )}
+      <form onSubmit={onSubmit} noValidate className="card">
+        <div className="field">
+          <label htmlFor="first_name">First Name *</label>
+          <input
+            id="first_name"
+            name="first_name"
+            value={data.first_name}
+            onChange={onChange}
+            required
+          />
         </div>
-      </div>
+
+        <div className="field">
+          <label htmlFor="last_name">Last Name *</label>
+          <input
+            id="last_name"
+            name="last_name"
+            value={data.last_name}
+            onChange={onChange}
+            required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="email">Email *</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            value={data.email}
+            onChange={onChange}
+            required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="phone">Phone</label>
+          <input
+            id="phone"
+            name="phone"
+            value={data.phone}
+            onChange={onChange}
+            placeholder="(555) 123-4567"
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="experience_level">Art experience level</label>
+          <select
+            id="experience_level"
+            name="experience_level"
+            value={data.experience_level}
+            onChange={onChange}
+          >
+            <option value="">Select one…</option>
+            {EXPERIENCE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Submitting…" : "Sign Up"}
+        </button>
+      </form>
+    </main>
+  );
+}
+
+/* ------------------------- App Layout -------------------- */
+export default function App() {
+  return (
+    <div className="shell">
+      {/* Left: carousel (desktop), stacks below on small screens */}
+      <Carousel />
+      {/* Right: signup form */}
+      <SignupForm />
     </div>
   );
 }
