@@ -1,14 +1,9 @@
 // src/lib/supabaseClient.ts
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const url = "https://qioetnisvxtibwbisnyl.supabase.co";
+const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpb2V0bmlzdnh0aWJ3YmlzbnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4NTg0OTcsImV4cCI6MjA3MDQzNDQ5N30.vKWGrqot_r2n5f4nhoN77hz1CQcYt_L7i78CpkTjqsI";
 
 console.log("Supabase URL:", url);
-console.log("Supabase Key (first 8 chars):", key?.slice(0, 8));
-
-if (!url || !key) {
-  console.warn("❌ Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
-}
 
 export const supabase = createClient(url, key);
