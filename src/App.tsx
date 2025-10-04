@@ -10,7 +10,7 @@ type FormData = {
   last_name: string;
   email: string;
   phone?: string;
-  experience_level: string; // dropdown
+  experience: string; // dropdown
 };
 
 type Slide = {
